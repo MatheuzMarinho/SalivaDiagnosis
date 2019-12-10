@@ -28,12 +28,13 @@ def build_args_parser():
                              '    * Number of individuals\n       '
                              '    * Mutation ratio\n       '
                              '    * Selection type: 1 (Round Robin), 2 (Elitism) or 3 (Roulette)\n       '
+                             '    * Number of descendants:\n'
                              '2 - Particle Swarm Optimization:\n       '
                              '    * Population Size\n       '
                              '    * Max number of iterations without improvement\n       '
                              '    * Cognitive coefficient\n       '
                              '    * Social coefficient\n       '
-                             '    * Inertia coefficient\n       ')
+                             '    * Inertia coefficient\n')
 
     return parser
 
