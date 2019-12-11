@@ -3,12 +3,13 @@ from ga import ga
 from pso import pso
 
 import pandas as pd
+import matplotlib.pyplot as plt
 import os
 import config_factory
 
 
 def build_args_parser():
-    usage = 'python salivadiagnosis.py --dataset <dataset file>\n       ' \
+    usage = 'python salivadiagnosis.py\n       ' \
             'run with --help for arguments descriptions'
     parser = ArgumentParser(description='A python algorithm that optimizes the attributes of the SalivaTec database '
                                         'used to predict patients oral health.', usage=usage)
@@ -43,17 +44,14 @@ def main():
     args_parser = build_args_parser()
     args = args_parser.parse_args()
 
-    if not os.path.exists(args.out_path):
-        os.makedirs(args.out_path)
-
-    dataset = pd.read_csv(args.dataset_path)
+    dataset = pd.read_csv(args.dataset_path).dropna(axis='columns')
 
     config_file = open(args.config_path, 'r')
     config_content = config_file.read()
     config_file.close()
 
-    optimization_result = run_optimization(args.algorithm, dataset, config_content)
-    # TODO: salvar resultados
+    selected_cols, best_fitness_history, execution_time = run_optimization(args.algorithm, dataset, config_content)
+    save_results(selected_cols, best_fitness_history, execution_time, args.out_path)
 
 
 def run_optimization(algorithm, dataset, config_content):
@@ -66,6 +64,30 @@ def run_optimization(algorithm, dataset, config_content):
         result = pso.execute(dataset, config)
 
     return result
+
+
+def save_results(selected_cols, best_fitness_history, execution_time, out_path):
+    if not os.path.exists(out_path):
+        os.makedirs(out_path)
+
+    file_path = os.path.join(out_path, "result_metrics.txt")
+    file = open(file_path, 'w')
+    file.write("Selected cols: " + str(selected_cols) + "\n")
+    file.write("Best fitness: " + str(best_fitness_history[-1]) + "\n")
+    file.write("Number of Iterations: " + str(len(best_fitness_history)) + "\n")
+    file.write("Execution Time: " + str(execution_time) + "\n")
+    file.close()
+
+    file_path = os.path.join(out_path, "fitness_history.txt")
+    file = open(file_path, 'w')
+    for fit in best_fitness_history:
+        file.write(str(fit) + "\n")
+    file.close()
+
+    plt.plot(best_fitness_history)
+    plt.xlabel('Iteration')
+    plt.ylabel('Distance')
+    plt.savefig(out_path + "/fitness_history.png")
 
 
 if __name__ == '__main__':
