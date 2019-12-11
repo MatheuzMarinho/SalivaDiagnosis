@@ -1,5 +1,5 @@
 from random import sample, randint, choices, choice, shuffle
-from mlp import mlp
+from svm import svm
 import time
 import heapq
 
@@ -10,9 +10,9 @@ def execute(dataset, config):
 
     unimproved_iterations_limit = 30
 
+    best_individual = None
     best_fitness = None
     best_fitness_history = []
-    best_individual = None
     unimproved_iterations = 0
     num_iterations = 0
     execution_time = 0
@@ -52,7 +52,8 @@ def execute(dataset, config):
 
     print('##################################')
 
-    return best_individual, best_fitness_history, execution_time
+    selected_cols = [i[0] for i in best_individual]
+    return selected_cols, best_fitness_history, execution_time
 
 
 def __init_population(cols, num_individuals):
@@ -60,13 +61,12 @@ def __init_population(cols, num_individuals):
     num_cols = len(cols)
 
     for i in range(num_individuals):
-        selected_indices = sample(range(num_cols), randint(0, num_cols))
+        individual = []
 
         for j in range(num_cols):
-            if j in selected_indices:
-                population.append((cols[j], True))
-            else:
-                population.append((cols[j], False))
+            individual.append((cols[j], choice([True, False])))
+
+        population.append(individual)
 
     return population
 
@@ -88,13 +88,13 @@ def __reproduction(population, config, dataset):
 
 def __get_population_weights(population, dataset):
     all_fitness = [__get_fitness(i, dataset) for i in population]
-    worst_fitness = max(all_fitness)
+    worst_fitness = min(all_fitness)
     weights = [1 - (curr_fitness / worst_fitness) for curr_fitness in all_fitness]
     return weights
 
 
 def __get_fitness(individual, dataset):
-    return mlp.train(individual, dataset)
+    return svm.train(individual, dataset)
 
 
 def __choices_no_replacement(population, weights, num_choices):
