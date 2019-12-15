@@ -1,12 +1,12 @@
-from random import sample, randint, choices, choice, shuffle
-from svm import svm
+from random import sample, choices, choice, shuffle
+from random_forest import random_forest
 import time
 import heapq
 
 
 def execute(dataset, config):
     cols = list(dataset)[:-1]
-    population = __init_population(cols, config.num_individuals)
+    population = __init_population(cols, config.num_individuals, dataset)
 
     unimproved_iterations_limit = 30
 
@@ -25,9 +25,9 @@ def execute(dataset, config):
         num_iterations += 1
 
         population = __reproduction(population, config, dataset)
-        population = __selection(population, config, dataset)
-        best_individual_candidate = __get_best_individuals(population, 1, dataset)[0]
-        best_fitness_candidate = __get_fitness(best_individual_candidate, dataset)
+        population = __selection(population, config)
+        best_individual_candidate = __get_best_individuals(population, 1)[0]
+        best_fitness_candidate = best_individual_candidate[1]
 
         if best_fitness is None or best_fitness_candidate > best_fitness:
             best_fitness = best_fitness_candidate
@@ -56,17 +56,17 @@ def execute(dataset, config):
     return selected_cols, best_fitness_history, execution_time
 
 
-def __init_population(cols, num_individuals):
+def __init_population(cols, num_individuals, dataset):
     population = []
     num_cols = len(cols)
 
     for i in range(num_individuals):
-        individual = []
+        individual_values = []
 
         for j in range(num_cols):
-            individual.append((cols[j], choice([True, False])))
+            individual_values.append((cols[j], choice([True, False])))
 
-        population.append(individual)
+        population.append((individual_values, __get_fitness(individual_values, dataset)))
 
     return population
 
@@ -74,37 +74,34 @@ def __init_population(cols, num_individuals):
 def __reproduction(population, config, dataset):
     new_population = []
 
-    weights = __get_population_weights(population, dataset)
+    weights = __get_population_fitness(population)
 
     while len(new_population) < config.num_individuals * config.num_descendants:
-        parents = __choices_no_replacement(population, weights, 2)
+        parents = __weighted_sample(population, weights, 2)
 
         for i in range(config.num_descendants):
-            new_population.append(__generate_descendant(parents, config.mutation_ratio))
+            new_population.append(__generate_descendant(parents, config.mutation_ratio, dataset))
 
     new_population += population
     return new_population
 
 
-def __get_population_weights(population, dataset):
-    all_fitness = [__get_fitness(i, dataset) for i in population]
-    worst_fitness = min(all_fitness)
-    weights = [1 - (curr_fitness / worst_fitness) for curr_fitness in all_fitness]
-    return weights
+def __get_population_fitness(population):
+    return [i[1] for i in population]
 
 
-def __get_fitness(individual, dataset):
-    return svm.train(individual, dataset)
+def __get_fitness(individual_values, dataset):
+    return random_forest.train(individual_values, dataset)
 
 
-def __choices_no_replacement(population, weights, num_choices):
+def __weighted_sample(population, weights, num_choices):
     result = []
     indices = list(range(len(population)))
     weights_copy = weights.copy()
 
     while num_choices > 0:
         index = choices(population=indices, weights=weights_copy, k=1)[0]
-        result.append(population[index].copy())
+        result.append(population[index])
         i = indices.index(index)
         del indices[i]
         del weights_copy[i]
@@ -113,52 +110,50 @@ def __choices_no_replacement(population, weights, num_choices):
     return result
 
 
-def __generate_descendant(parents, mutation_ratio):
-    num_cols = len(parents[0])
+def __generate_descendant(parents, mutation_ratio, dataset):
+    num_cols = len(parents[0][0])
     crossover_index = choice(list(range(1, num_cols)))
-    parent_1_frag = parents[0][0:crossover_index]
-    parent_2_frag = parents[1][crossover_index:]
-    descendant = parent_1_frag + parent_2_frag
-    __mutate(descendant, mutation_ratio)
+    parent_1_frag = parents[0][0][0:crossover_index]
+    parent_2_frag = parents[1][0][crossover_index:]
+    descendant_values = parent_1_frag + parent_2_frag
+    __mutate(descendant_values, mutation_ratio)
 
-    return descendant
+    return descendant_values, __get_fitness(descendant_values, dataset)
 
 
-def __mutate(descendant, mutation_ratio):
+def __mutate(descendant_values, mutation_ratio):
     if mutation_ratio > 0:
-        num_cols = len(descendant[0])
+        num_cols = len(descendant_values)
         num_cols_to_mutate = int(num_cols * mutation_ratio)
         indices_to_mutate = sample(range(num_cols), num_cols_to_mutate)
 
         for i in indices_to_mutate:
-            if choice([True, False]):
-                col_name, col_value = descendant[i]
-                descendant[i] = (col_name, not col_value)
+            col_name, col_value = descendant_values[i]
+            descendant_values[i] = (col_name, not col_value)
 
 
-def __selection(population, config, dataset):
+def __selection(population, config):
     if config.selection_type == 1:
-        return __round_selection(population, config.num_individuals, config.num_descendants, dataset)
+        return __round_selection(population, config.num_individuals, config.num_descendants)
     elif config.selection_type == 2:
-        return __elitist_selection(population, config.num_individuals, dataset)
+        return __elitist_selection(population, config.num_individuals)
     elif config.selection_type == 3:
-        return __roulette_selection(population, config.num_individuals, dataset)
+        return __roulette_selection(population, config.num_individuals)
 
 
-def __round_selection(population, num_individuals, num_descendants, dataset):
+def __round_selection(population, num_individuals, num_descendants):
     shuffle(population)
-    round_size = num_descendants + 2
 
     new_population = []
     for i in range(0, num_individuals):
-        population_slice = population[i * round_size:round_size * (i + 1)]
-        new_population.append(__get_best_individuals(population_slice, 1, dataset)[0])
+        population_slice = population[i * num_descendants:num_descendants * (i + 1)]
+        new_population.append(__get_best_individuals(population_slice, 1)[0])
 
     return new_population
 
 
-def __get_best_individuals(population, num_individuals, dataset):
-    all_fitness = [__get_fitness(individual, dataset) for individual in population]
+def __get_best_individuals(population, num_individuals):
+    all_fitness = __get_population_fitness(population)
     best_fitness = heapq.nlargest(num_individuals, all_fitness)
     best_fitness_indices = [all_fitness.index(curr_fitness) for curr_fitness in best_fitness]
     best_individuals = [population[i] for i in best_fitness_indices]
@@ -166,13 +161,13 @@ def __get_best_individuals(population, num_individuals, dataset):
     return best_individuals
 
 
-def __elitist_selection(population, num_individuals, dataset):
-    new_population = __get_best_individuals(population, num_individuals, dataset)
+def __elitist_selection(population, num_individuals):
+    new_population = __get_best_individuals(population, num_individuals)
     return new_population
 
 
-def __roulette_selection(population, num_individuals, dataset):
-    weights = __get_population_weights(population, dataset)
-    return __choices_no_replacement(population, weights, num_individuals)
+def __roulette_selection(population, num_individuals):
+    weights = __get_population_fitness(population)
+    return __weighted_sample(population, weights, num_individuals)
 
 
