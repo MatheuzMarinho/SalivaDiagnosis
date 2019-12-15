@@ -1,12 +1,13 @@
 from sklearn import preprocessing
-from sklearn.svm import LinearSVC
-from sklearn.model_selection import cross_val_score
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+
 import pandas as pd
 
 
-def train(individual, dataset):
+def train(individual_values, dataset):
     # Selecionando as colunas que serão utilizadas no treinamento
-    selected_tuples = filter(lambda x: x[1], individual)
+    selected_tuples = filter(lambda i: i[1], individual_values)
     selected_cols = [t[0] for t in selected_tuples]
     new_dataset = dataset.filter(selected_cols + ['diagnostico_oral'])
 
@@ -15,10 +16,11 @@ def train(individual, dataset):
     trans_dataset_str = new_dataset.select_dtypes(include=['object']).astype(str).apply(le.fit_transform)
     trans_dataset_numeric = new_dataset.select_dtypes(exclude=['object'])
     trans_dataset = pd.concat([trans_dataset_numeric, trans_dataset_str], axis=1)
+    x, y = trans_dataset.iloc[:, 0:-1].values.tolist(), trans_dataset.iloc[:, -1].values.tolist()
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3)
 
-    # Treinamento da SVM
-    classifier = LinearSVC(tol=1e-5)
-    inputs, outputs = trans_dataset.iloc[:, 0:-1].values.tolist(), trans_dataset.iloc[:, -1].values.tolist()
-    scores = cross_val_score(classifier, inputs, outputs, cv=10)
+    # Classificando usando "Random Forest"
+    clf = RandomForestClassifier(n_estimators=101, n_jobs=-1)
+    clf.fit(x_train, y_train)
 
-    return scores.mean()
+    return clf.score(x_test, y_test)
