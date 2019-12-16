@@ -5,4 +5,4 @@ class PsoConfig:
         self.max_iterations = int(config_list[1])
         self.cognitive_coeff = float(config_list[2])
         self.social_coeff = float(config_list[3])
-        self.inertia_coeff = float(config_list[4])
+        self.inertia_coeff = str(config_list[4])
