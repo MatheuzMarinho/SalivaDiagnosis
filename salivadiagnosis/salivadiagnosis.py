@@ -44,7 +44,7 @@ def main():
     args_parser = build_args_parser()
     args = args_parser.parse_args()
 
-    dataset = pd.read_csv(args.dataset_path).dropna(axis='columns')
+    dataset = pd.read_csv(args.dataset_path)
 
     config_file = open(args.config_path, 'r')
     config_content = config_file.read()
